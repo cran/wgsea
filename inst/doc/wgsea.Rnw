@@ -1,0 +1,251 @@
+% \VignetteDepends{snpStats}
+% \VignetteDepends{wgsea}
+% \VignetteIndexEntry{wgsea}
+% \VignettePackage{wgsea}
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{amsmath}
+\usepackage{graphicx,subfigure}
+\usepackage{fullpage}
+
+\newcommand{\Robject}[1]{{\texttt{#1}}}
+\newcommand{\Rfunction}[1]{{\texttt{#1}}}
+\newcommand{\Rpackage}[1]{{\texttt{#1}}}
+\newcommand{\Rclass}[1]{{\texttt{#1}}}
+\newcommand{\Rmethod}[1]{{\texttt{#1}}}
+\newcommand{\Rfunarg}[1]{{\texttt{#1}}}
+
+\begin{document}
+
+\title{Gene set enrichment analysis using Wilcoxon tests}
+\author{Chris Wallace \\
+Cambridge Institute for Medical Research \\
+University of Cambridge \\
+homepage: \texttt{http://www-gene.cimr.cam.ac.uk/staff/wallace} \\
+email: \texttt{chris.wallace at cimr.cam.ac.uk}}
+
+
+\maketitle
+\bibliographystyle{plain}
+\tableofcontents
+
+% library(tools)
+% Rnwfile <- file.path("c:/alan/biostat/storey/fdr/package/vignette", "qvalue.Rnw")
+% Sweave(Rnwfile)
+
+\section{Overview}
+
+Gene set enrichment analysis (GSEA) is typically based on tests derived from
+the Kolmogorov-Smirnov, which is underpowered and a need for simpler methods has been
+identified.\cite{irizarry09}
+
+The \Rpackage{wgsea} package contains functions for conducting GSEA using a
+Wilcoxon test to test for differences in the distribution of p values between
+SNPs within the gene set under test and a control set of SNPs.  The mean of
+the Wilcoxon test statistic is unperturbed by correlation between the SNPs
+resulting from linkage disequilibrium, but its variance is.  We use
+permutation of the case control status to generate Wilcoxon statistics under
+the null.  This permutation preserves the correlation structure, and because
+we are only trying to estimate the variance rather than a permutation p value
+we need only a modest number of permutations.
+
+This vignette steps through analysis of an example dataset.  For
+further detail, and example of an application to real data, please see
+\cite{heinig10}.
+
+\section{Example data}
+
+We load the example data from snpStats, and split the SNPs into two
+groups, according to whether or not they show deviation from Hardy
+Weinberg equilibrium.  This is generally an indicator of poor
+genotyping and such SNPs are excluded, particularly as they may be
+examples of differential genotyping error between cases and controls
+which may induce spurious associations.  We will examine here whether
+that is the case in this small subset of data.
+
+<<echo=TRUE>>=
+library(snpStats)
+library(wgsea)
+
+## load example data from snpStats
+data(for.exercise,package="snpStats")
+
+## generate an artificial indicator of test and control SNPs.
+snpsum <- col.summary(snps.10)
+snp.indicator <- abs(snpsum$z.HWE) > 1.96
+
+## subset to case and control objects
+case <- snps.10[subject.support$cc==1,!is.na(snp.indicator)]
+control <- snps.10[subject.support$cc==0,!is.na(snp.indicator)]
+snp.indicator <- snp.indicator[!is.na(snp.indicator)]
+@
+
+We use \texttt{pairtest}, a wrapper for the \texttt{snpStats} function
+\texttt{single.snp.tests}, to generate p values for the association of each
+SNP with T1D.  We also store the minor allele frequencies (MAF) to allow
+investigation of whether MAF confounds our test.
+
+<<echo=TRUE>>=
+maf <- col.summary(control)[,"MAF"]
+p <- pairtest(case,control)
+@
+
+A naive Wilcoxon analysis of the p values might be
+<<echo=TRUE>>=
+wilcox.test(x=p[snp.indicator==1], 
+            y=p[snp.indicator==0])
+@
+
+but the considerable linkage disequilibrium between SNPs would cause the
+variance to be under estimated and so cause the test to be anti conservative.
+
+Instead, we generate a set of permuted phenotypes and use these to generate a
+null distribution of the Wilcoxon test statistic, from which we
+calculate its variance.  This step can take a while, depending on the
+number of permutations and the size of your dataset.  Here, we use
+only 10 to keep computation down.  \texttt{pairtest} prints dots to
+monitor progress of the permutations.
+
+% use eval=FALSE here only to suppress the dots printed by pairtest
+% for monitoring progress of permutations
+<<echo=TRUE>>=
+n.perm=10
+p.perm <- pairtest(case,control,n.perm=n.perm)
+@
+
+We can now calculate a Wilcoxon statistic for the observed data, and for the
+permuted data.
+
+<<echo=TRUE>>=
+## calculate wilcoxon score
+W <- wilcoxon(p,snps.in=which(snp.indicator==1))
+Wstar <- wilcoxon(p.perm,snps.in=which(snp.indicator==1))
+@
+
+The empirical estimate of variance is considerably increased compared
+to the theoretical, and we can examine how many permutations are
+required to estimate it reasonably well.  Because we have set
+\texttt{n.perm=10} in this vignette, we cannot see convergence;
+instead we substitute a figure generated previously using 10000
+permutations.  Our experience suggests that the results here, showing
+that convergence takes several thousand permutations, are unusual, and
+relate to the inclusion of SNPs with extreme case-control differences
+in a relatively small dataset.  For larger datasets in which SNPs with
+genotyping errors have been excluded, convergence is typically
+achieved in hundreds, and not thousands of permutations.  However,
+each permutation is computationally expensive, and for this reason, we
+recommend storing the \texttt{p.perm} object once generated, as
+refinements are often made to the list of SNPs to be tested, and
+\texttt{Wstar} can be regenerated relatively quickly given
+\texttt{p.perm}.  Note also, that if the whole genome is being
+examined, it can make sense to parallelise the computations, by
+running different chromosomes seperately, for example.  The p.perm
+objects thus created can be combined using \texttt{rbind()}.
+
+<<echo=TRUE,fig=TRUE,include=FALSE>>=
+## running empirical estimate of variance
+#W.var <- sapply(2:n.perm,function(i) var(Wstar[sample(1:n.perm,size=i)]))
+W.var <- sapply(2:n.perm,function(i) var(Wstar[1:i]))
+
+## theoretical variance for comparison
+n1 <- sum(snp.indicator)
+n2 <- sum(!snp.indicator)
+var.theoretical <-  exp(log(n1) + log(n2) + log(n1+n2+1) - log(12))
+
+## plot
+plot(2:n.perm,W.var,ylim=range(c(W.var,var.theoretical)),pch=".",
+     xlab="Permutation number",ylab="Var(W*)",main="Estimate of Var(W*) vs number of permutations",
+     sub="(dotted line shows theoretical value)")
+abline(h=var.theoretical,lty=3)
+@
+\begin{figure}[ht]
+  \begin{center}
+    \includegraphics[width=5in,height=5in]{Wstar-var}
+  \end{center}
+  \caption{Histogram of p-values.}
+\end{figure}
+
+Finally, we calculate an overall significance level for comparing whether our
+test SNPs are more associated with T1D than our control SNPs.  Although we do
+not expect the expected null value of \texttt{W} to be perturbed due to
+linkage disequilibrium, we report two Z scores
+
+\begin{align*}
+  Z_{\text{theoretical}} &= (W - \mu)/\operatorname{sd}(W^*)\\
+  Z_{\text{empirical}} &= (W - \overline{W^*})/\operatorname{sd}(W^*)
+\end{align*}
+
+where $\mu$ is the theoretical mean of the Wilcoxon distribution.
+
+<<echo=TRUE>>=
+Z.value(W=W, Wstar=Wstar, n.in=sum(snp.indicator==1), n.out=sum(snp.indicator==0))
+@
+
+\section{Addressing potential confounding using propensity scores}
+
+There is a tendency for less common SNPs to show smaller p
+values than more common, presumably because genotype calls tend to be
+less accurate for rarer SNPs, and we are contrasting poorly with well
+genotyped SNPs, but we have observed this phenomenom to a lesser
+extent in other datasets which have passed quality control measures.
+
+<<echo=TRUE>>=
+cor.test(maf,p)
+@
+
+We address this, and could address any other similar confounders,
+using propensity score weights\cite{rosenbaum83,rosenbaum87}.
+\texttt{maf} is binned (by default in bins of width 0.05) and we
+calculate
+$$w_b = \frac{n_b/n}{m_b/m}$$
+as the weight for SNPs in bin $b$, with $m$ and $n$ the number of
+SNPs in the test set, and the total number of SNPs, respectively and
+$m_b$, $n_b$ the same within bin $b$. \texttt{maf} may be used to
+generate these weights by using the \texttt{weights} argument of
+\texttt{wilcoxon}
+
+<<echo=TRUE>>=
+## calculate wilcoxon score
+W.weighted <- wilcoxon(p,snps.in=which(snp.indicator==1),weights=maf)
+Wstar.weighted <- wilcoxon(p.perm,snps.in=which(snp.indicator==1),weights=maf)
+Z.value(W=W.weighted, Wstar=Wstar.weighted,
+        n.in=sum(snp.indicator==1), n.out=sum(snp.indicator==0))
+@
+
+We see that, in this case, the adjustment makes some difference, but
+that, unsuprisingly, that SNPs with poor quality control profiles, ie
+those with high Hardy Weinberg absolute $Z$ scores, do have a
+different profile of p values compared to SNPs with good quality
+control profiles.  This is true even after allowing for the fact that
+poor quality calls are more likely for rarer SNPs.
+
+\section{Combining Wilcoxons from multiple datasets}
+Many GWAS datasets are now combined from different sources using meta
+analysis and this data structure can be analysed combining the
+Wilcoxon statistics over strata defined by SNP chip or GWAS group.  We
+apply van Elteren's combined test\cite{vanelteren60} which is optimal
+assuming the effect is constant across strata, which seems a
+reasonable assumption in this application.  We do not have example
+data from multiple datasets available.  But, if required, it is simple
+to generate a combined test statistic by following the procedure above
+within each dataset, then applying the \texttt{Z.value} function with
+lists of $W$ statistics.  Under this use, the  arguments to \texttt{Z.value} are:
+\begin{itemize}
+\item \texttt{W}: a list of W values from each study
+\item \texttt{Wstar}: a list of Wstar vectors from each study
+\item \texttt{n.in}: a vector of the number of SNPs in the test
+  regions in each study
+\item \texttt{n.out}: a vector of the number of SNPs in the control
+  regions in each study.
+\end{itemize}
+
+For example purposes, we can combine the Wilcoxon stats from above:
+<<echo=TRUE>>=
+Z.value(W=list(W,W), Wstar=list(Wstar,Wstar), 
+        n.in=rep(sum(snp.indicator==1),2), 
+        n.out=rep(sum(snp.indicator==0),2))
+@ 
+
+\bibliography{wgsea}
+
+\end{document}

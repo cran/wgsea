@@ -1,0 +1,4 @@
+2012-05-26  Chris Wallace
+
+	* R/Z.value.R (Z.value): fixed p value bug
+
