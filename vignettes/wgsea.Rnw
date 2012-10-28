@@ -21,7 +21,6 @@
 \author{Chris Wallace \\
 Cambridge Institute for Medical Research \\
 University of Cambridge \\
-homepage: \texttt{http://www-gene.cimr.cam.ac.uk/staff/wallace} \\
 email: \texttt{chris.wallace at cimr.cam.ac.uk}}
 
 \maketitle

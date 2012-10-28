@@ -1,1 +1,2 @@
 export(wilcoxon,pairtest,genperms,Z.value)
+importFrom(snpStats,p.value,single.snp.tests,rbind)
