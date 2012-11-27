@@ -1,3 +1,8 @@
+2012-11-27 Chris Wallace
+
+	* Updated dependency on snpStats to require version 1.2.1
+	* Updated examples to work with recent snpStats which changed cbin() function
+
 2012-05-26  Chris Wallace
 
 	* R/Z.value.R (Z.value): fixed p value bug
