@@ -179,7 +179,7 @@ where $\mu$ is the theoretical mean of the Wilcoxon distribution.
 Z.value(W=W, Wstar=Wstar, n.in=sum(snp.indicator==1), n.out=sum(snp.indicator==0))
 @
 
-\section{Addressing potential confounding using propensity scores}
+\section{Addressing potential confounding using inverse probability weighting}
 
 There is a tendency for less common SNPs to show smaller p
 values than more common, presumably because genotype calls tend to be
@@ -192,7 +192,7 @@ cor.test(maf,p)
 @
 
 We address this, and could address any other similar confounders,
-using propensity score weights\cite{rosenbaum83,rosenbaum87}.
+using inverse probability weights\cite{rosenbaum83,rosenbaum87}.
 \texttt{maf} is binned (by default in bins of width 0.05) and we
 calculate
 $$w_b = \frac{n_b/n}{m_b/m}$$
@@ -216,6 +216,12 @@ those with high Hardy Weinberg absolute $Z$ scores, do have a
 different profile of p values compared to SNPs with good quality
 control profiles.  This is true even after allowing for the fact that
 poor quality calls are more likely for rarer SNPs.
+
+\textbf{Note that the theoretical mean of the Wilcoxon distribution is
+calculated ignoring weights, so when using inverse probability
+weighting, you should anticipate a discrepancy between the p values
+calculated using empirical and theoretical means, and prefer that
+calculated using the empirical mean.}
 
 \section{Combining Wilcoxons from multiple datasets}
 Many GWAS datasets are now combined from different sources using meta

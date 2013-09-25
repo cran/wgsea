@@ -1,3 +1,9 @@
+2013-07-18 Olly Burren, Chris Wallace
+
+	* v1.8
+	* Bugfix for propensity weights in wilcoxon() function
+	* Introduction of unit tests, by Olly Burren
+
 2012-11-27 Chris Wallace
 
 	* Updated dependency on snpStats to require version 1.2.1

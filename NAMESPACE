@@ -1,2 +1,5 @@
-export(wilcoxon,pairtest,genperms,Z.value)
-importFrom(snpStats,p.value,single.snp.tests,rbind)
+export(Z.value)
+export(genperms)
+export(pairtest)
+export(varplot)
+export(wilcoxon)

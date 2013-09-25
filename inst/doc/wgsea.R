@@ -61,7 +61,7 @@ n2 <- sum(!snp.indicator)
 var.theoretical <-  exp(log(n1) + log(n2) + log(n1+n2+1) - log(12))
 
 ## plot
-plot(2:n.perm,W.var,ylim=range(c(W.var,var.theoretical)),pch="x",
+plot(2:n.perm,W.var,ylim=range(c(W.var,var.theoretical)),pch=".",
      xlab="Permutation number",ylab="Var(W*)",main="Estimate of Var(W*) vs number of permutations",
      sub="(dotted line shows theoretical value)")
 abline(h=var.theoretical,lty=3)
@@ -90,7 +90,7 @@ Z.value(W=W.weighted, Wstar=Wstar.weighted,
 
 
 ###################################################
-### code chunk number 10: wgsea.Rnw:241-244
+### code chunk number 10: wgsea.Rnw:247-250
 ###################################################
 Z.value(W=list(W,W), Wstar=list(Wstar,Wstar), 
         n.in=rep(sum(snp.indicator==1),2), 
